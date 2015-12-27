@@ -1,0 +1,84 @@
+#!/usr/local/bin/python
+import os
+import sys
+import platform
+
+ok=0
+warning=1
+error=2
+
+all_count = 0
+enabled_count = 0
+disabled_count = 0
+failed_count = 0
+missing_count = 0
+detected_count = 0
+all_enabled = ""
+all_disabled = ""
+all_failed = ""
+all_missing = ""
+all_detected = ""
+
+# Enabled - Indicates that the path is configured and operational. It will be considered when paths are selected for IO.
+# Disabled - Indicates that the path is configured, but not currently operational. It has been manually disabled and will not be considered when paths are selected for IO.
+# Failed - Indicates that the path is configured, but it has had IO failures that have rendered it unusable. It will not be considered when paths are selected for IO.
+# Defined - Indicates that the path has not been configured into the device driver.
+# Missing - Indicates that the path was defined in a previous boot, but it was not detected in the most recent boot of the system.
+# Detected - Indicates that the path was detected in the most recent boot of the system, but for some reason it was not configured. A path should only have this status during boot and so this status should never appear as a result of the lspath command.
+
+# check_failed = os.popen('lspath').read().strip().count('Failed')
+# check_missing = os.popen('lspath').read().strip().count('Missing')
+# check_enabled = os.popen('lspath').read().strip().count('Enabled')
+
+a = os.popen('lspath').readlines()
+for line in a:
+    (status, disk, vscsi) = line.split()
+    all_count = all_count+1
+    if status == "Enabled":
+        enabled = disk, vscsi
+	enabled_count = enabled_count+1
+        all_enabled += "; %s" % " ".join( enabled )
+    elif status == "Disabled":
+	disabled = disk, vscsi
+	disabled_count = disabled_count+1
+        all_disabled += "; %s" % " ".join( disabled )
+    elif status == "Failed":
+        failed = disk, vscsi
+	failed_count = failed_count+1
+        all_failed += "; %s" % " ".join( failed )
+    elif status == "Missing":
+        missing = disk, vscsi
+	missing_count = missing_count+1
+        all_missing += "; %s" % " ".join( missing )
+    elif status == "Detected":
+        detected = disk, vscsi
+	detected_count = detected_count+1
+        all_detected += "; %s" % " ".join( detected )
+#    else:
+#	print "Something failed badly..."
+#	retval = error
+
+all_enabled = all_enabled[3:]
+all_disabled = all_disabled[3:]
+all_failed = all_failed[3:]
+all_missing = all_missing[3:]
+all_detected = all_detected[3:]
+
+if missing_count == 0 and failed_count == 0:
+    print "%s paths - %s enabled (%s)" % (all_count, enabled_count, all_enabled)
+    retval = ok
+if missing_count == 1:
+    print "%s paths - %s missing (%s) - %s enabled (%s)" % (all_count, missing_count, all_missing, enabled_count, all_enabled)
+    retval = warning
+if missing_count > 1:
+    print "%s paths - %s missing (%s) - %s enabled (%s)" % (all_count, missing_count, all_missing, enabled_count, all_enabled)
+    retval = warning
+if failed_count == 1:
+    print "%s paths - %s failed (%s) - %s enabled (%s)" % (all_count, failed_count, all_failed, enabled_count, all_enabled)
+    retval = error
+if failed_count > 1:
+    print "%s paths - %s failed (%s) - %s enabled (%s)" % (all_count, failed_count, all_failed, enabled_count, all_enabled)
+    retval = error
+
+
+sys.exit(retval)
