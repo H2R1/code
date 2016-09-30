@@ -1,0 +1,112 @@
+#!/usr/local/bin/python
+###############################################################################
+import os
+import sys
+import glob
+from es import check
+###############################################################################
+OK=0
+WARNING=1
+ERROR=2
+UNKNOWN=3
+###############################################################################
+def getDevices():
+    if os.uname()[2] != '5.10':
+        print "system is not solaris 10+"
+        sys.exit(OK)
+
+    devices = []
+    dladm = os.popen("/sbin/dladm show-dev")
+
+    for line in dladm:
+        line = line.split()
+        if line[2] == 'up':
+            devices.append(line[0])
+    return devices
+###############################################################################
+def getpersistency():
+    hFiles = glob.iglob('/etc/hostname.*')
+    hostnames = []
+    for line in hFiles:
+        hostnames.append(line.split('.')[1])
+
+    return hostnames
+###############################################################################
+def calculate(devices, hFiles):
+    missing = []
+    for interface in  devices:
+        if interface not in hFiles:
+            missing.append(interface)
+    return missing
+###############################################################################
+def checkinterface(osname):
+    ifconfig = os.popen("ifconfig -a").readlines()
+    interface_list = {}
+    interface = {}
+    for line in ifconfig:
+        if "group" in line or "deprecated" in line or "failover" in line or "addif" in line:
+            check.exitUnknown("unsupported features in interface configuration, os %s, please inspect manually." % osname)
+            sys.exit(OK)
+        if line.split()[0][-1] == ":":
+            if interface.has_key('interface'):
+                interface_list[ interface['interface'] ] = interface
+            interface_name = line.split()[0]
+            interface = {}
+            interface['interface'] = interface_name
+        if line.split()[1].startswith('flags='):
+            flagsbefore = line.split('<')[0]
+            flags = flagsbefore.split('=')[1]
+            interface['flags'] = flags
+        elif "netmask" in line:
+            inet = line.split()[1]
+            netmask = line.split()[3]
+            interface['netmask'] = netmask
+            interface['inet'] = inet
+        elif "broadcast" in line:
+            broadcast = line.split()[5]
+            interface['broadcast'] = broadcast
+    errors = []
+    for i in interface_list.keys():
+        if interface_list[i]["netmask"] == "0":
+            errors.append( interface_list[i]["interface"] )
+            print "the netmask of '%(interface)s' is %(netmask)s" % interface_list[i]
+    print "there are %d interfaces in error %s" % ( len(errors), ", ".join( errors ) )
+
+    etc_host_entries = []
+    hosts_contents = os.popen('cat /etc/hosts').readlines()
+    hostnames = os.popen('grep . /etc/hostname.*').readlines()
+    hostname_list = []
+
+    for line in hosts_contents:
+        if line.startswith('#'):
+            continue
+        for entry in line.split():
+            etc_host_entries.append( entry )
+
+    for line in hostnames:
+        line = line.strip()
+        hostname_filename = ":".join( line.split(':')[:-1] )
+        hostname_contents = line.split(':')[-1]
+        hostname_list.append (hostname_filename)
+        hostname_list.append (hostname_contents)
+        if hostname_contents not in etc_host_entries:
+            print "hostname %s does not appear in the /etc/hosts file, please review %s" % (hostname_contents,hostname_filename)
+    return interface
+###############################################################################
+def main():
+    osname=os.uname()[0]
+    if osname == "SunOS":
+       	checkif = checkinterface(osname)
+       	devices = getDevices()
+       	hFiles = getpersistency()
+	missing = calculate(devices, hFiles)
+        if missing:
+            print missing, "are missing a /etc/hostname.<device> file"
+        else:
+            print "there is a one to one mapping betwen plumb interfaces and hostname files."
+            sys.exit(OK)
+    else:
+        check.exitUnknown("unsupported os %s" % osname)
+        sys.exit(OK)
+###############################################################################
+main()
