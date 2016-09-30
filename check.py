@@ -37,7 +37,7 @@ def exitUnknown(msg):
 
 ################################################################################
 def pingHost(host):
-    """ Return True if it can ping the host, or False if it cannot """
+    """ Return True if it can ping the host, or False if it cannot  """
     opsys=os.uname()[0]
     pingcmd={
         'SunOS': '/usr/sbin/ping',
