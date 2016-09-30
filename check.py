@@ -1,8 +1,5 @@
 #!/usr/bin/python2.7
-"""
-Library to assist with developing monitoring checks
-
-"""
+""" Library to assist with developing monitoring checks """
 
 import os, sys, time
 
@@ -40,8 +37,7 @@ def exitUnknown(msg):
 
 ################################################################################
 def pingHost(host):
-    """ Return True if it can ping the host, or False if it cannot
-    """
+    """ Return True if it can ping the host, or False if it cannot """
     opsys=os.uname()[0]
     pingcmd={
         'SunOS': '/usr/sbin/ping',
