@@ -1,0 +1,34 @@
+#!/bin/bash
+############################################################
+# check if we can cd in to each of the NFS filesystems
+#------------------------------------------------------------
+# Return Codes:
+OK=0	     # Everything was OK
+WARNING=1    # Something was not OK
+ERROR=2      # Something is broken
+UNKNOWN=3    # Unable to confirm if the check is OK or ERROR
+############################################################
+
+function check_nfsfilesystem {
+	if [[ $( uname ) == "Linux" ]];then
+		DF="df -F nfs -P"
+        elif [[ $( uname ) == "AIX" ]];then
+                DF="nfs4cl showstat"
+        else    
+		DF="df -F nfs -k"
+	fi
+
+	for NFS_FILESYSTEM in $( $DF | grep -v 'Mounted' | awk '{print $6}' )
+	do
+		cd $NFS_FILESYSTEM
+		RC=$?
+		if [[ ${RC} -ne 0 ]];then 
+			echo "The was a problem with $NFS_FILESYTEM"
+			exit ${ERROR}
+		fi
+	done
+
+}
+check_nfsfilesystem
+echo "All NFS filesystems are readable"
+exit ${OK}
