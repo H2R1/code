@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+############################################################
+# Check that we are not using too much swap
+#------------------------------------------------------------
+# Return Codes:
+OK=0	     # Everything was OK
+WARNING=1    # Something was not OK
+ERROR=2      # Something is broken
+UNKNOWN=3    # Unable to confirm if the check is OK or ERROR
+############################################################
+
+# Thresholds defined below, these are % USED values (so HIGHER is bad)
+SWAPWARN=50
+SWAPCRIT=100
+SWAPFREE=100
+SWAPCMD=`which swap 2> /dev/null`
+FREECMD=`which free 2> /dev/null`
+DISKCACHELIMIT=20
+DISKCACHE=5
+MESSAGE=""
+
+# Are we aix, solaris or linux?
+if [[ -f ${SWAPCMD} ]];then
+	# solaris
+    HAS_SWAP=`swap -l 2>&1`
+    if [[ "${HAS_SWAP}" == "No swap devices configured" ]];then
+        echo "No swap devices configured"
+        exit ${ERROR}
+    fi
+	SWAPFREE=`swap -l | tail -1 | awk '{print $5/$4*100}'`
+elif [[ -f ${FREECMD} ]];then
+	# linux
+	SWAPFREE=`free -m | grep -i swap | awk '{printf "%d",  $4/$2*100}'`
+	DISKCACHE=`free -m | grep Mem | awk '{print $7/$2*100}'`
+	MESSAGE="and ${DISKCACHE}% of disk cache"
+elif [[ -f ${SWAPCMD} ]];then
+	# aix
+    HAS_SWAP=`swap -l 2>&1`
+    if [[ "${HAS_SWAP}" == "No swap devices configured" ]];then
+        echo "no swap devices configured"
+        exit ${ERROR}
+    fi
+        SWAPFREE=`swap -l | grep -v free | sed 's/MB//g' | awk '{ tot += $4; free += $5 } END { print free/tot*100 }'`
+else
+	#Can't find either, could be unknown OS or bad path
+	echo "unable to find swap or free command"
+	exit ${UNKNOWN};
+fi
+# Convert free swap to total used
+let SWAPUSED=100-${SWAPFREE}
+
+/var/monitor-client/carbonclient.py -m swap.free -v ${SWAPFREE} >/dev/null 2>&1
+/var/monitor-client/carbonclient.py -m swap.used -v ${SWAPUSED} >/dev/null 2>&1
+
+if [[ ${SWAPUSED} -gt ${SWAPCRIT} ]];then
+	#if [[ ${DISKCACHE} -lt ${DISKCACHELIMIT} ]];then
+         if (( $(bc <<< "${DISKCACHE} < ${DISKCACHELIMIT}") == 1 ))
+         then
+		echo "swap used ${SWAPUSED}% is greater than critical threshold ${SWAPCRIT}%"
+		exit ${ERROR}
+	fi
+fi
+
+if [[ ${SWAPUSED} -gt ${SWAPWARN} ]];then
+	#if [[ ${DISKCACHE} -lt ${DISKCACHELIMIT} ]];then
+         if (( $(bc <<< "${DISKCACHE} < ${DISKCACHELIMIT}") == 1 ))
+         then
+		echo "swap used ${SWAPUSED}% is greater than warning threshold ${SWAPWARN}%"
+		exit ${WARNING}
+	fi
+fi
+
+# everything must be ok
+echo "using ${SWAPUSED}% of swap ${MESSAGE}"
+exit ${OK}
+#EOF

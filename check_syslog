@@ -1,0 +1,37 @@
+#!/usr/bin/env ksh
+############################################################
+# Check the SSHD service and make sure that we can connect
+# to the remote host via SSH. 
+#------------------------------------------------------------
+# Return Codes:
+OK=0	     # Everything was OK
+WARNING=1    # Something was not OK
+ERROR=2      # Something is broken
+UNKNOWN=3    # Unable to confirm if the check is OK or ERROR
+############################################################
+
+# Set the name of the process that we will check.
+PROCESS_NAME="syslog"
+
+# Set the the number of process that you would expect to be running
+MIN_PROC=0
+
+# run the check.
+# check for the results.
+RESULTS=$( ps -e |grep -c ${PROCESS_NAME} )
+RC=${?}
+
+# Check the results
+if [[ ${RESULTS} -gt ${MIN_PROC} ]];then
+	# Everything is OK
+	echo "number of processes for ${PROCESS_NAME}(${RESULTS}) is ok"
+	exit ${OK};
+else
+	# everything is broken
+	echo "number of processes for ${PROCESS_NAME}(${RESULTS}) is errored"
+	exit ${ERROR};
+fi
+
+# If we get to here then something didn't work was expected.
+echo "unable to check if ${PROCESS_NAME} is running or not"
+exit ${UNKNOWN}
