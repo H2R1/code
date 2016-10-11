@@ -41,7 +41,6 @@ def pingHost(host):
     opsys=os.uname()[0]
     pingcmd={
         'SunOS': '/usr/sbin/ping',
-        'Darwin': '/sbin/ping -c2',
         'Linux': '/bin/ping -c2',
         'AIX': '/etc/ping -c2',
         }
@@ -132,7 +131,6 @@ def _proc(processname, minproc=None, maxproc=None):
                     pidlist.append(bits['pid'])
                     foundProc=True
             f.close()
-
         else:
             f=os.popen('/bin/ps -eo comm,pid,args')
             for line in f:
@@ -147,18 +145,6 @@ def _proc(processname, minproc=None, maxproc=None):
         for line in f:
             bits=_handleInterpreters(line, ['comm','pid', 'args'])
             if os.path.basename(bits['cmd'])==processname:
-                pidlist.append(bits['pid'])
-                foundProc=True
-        f.close()
-    elif osname=='Darwin':
-        # Stupid thing truncates columns
-        # But the -c stops the requirement for handleInterpreters and
-        # the use of basename
-        f=os.popen('/bin/ps -wweco pid,args')
-        for line in f:
-            bits={}
-            bits['pid'], bits['cmd']=line.strip().split(None,1)
-            if bits['cmd']==processname:
                 pidlist.append(bits['pid'])
                 foundProc=True
         f.close()
@@ -273,8 +259,6 @@ def portUdpListen(port):
         cmd='/bin/netstat -anu'
     elif osname=='SunOS':
         cmd='/bin/netstat -an -P udp -f inet'
-    elif osname=='Darwin':
-        cmd='/usr/sbin/netstat -an -p udp -f inet'
     elif osname=='AIX':
         cmd='/usr/bin/netstat -an -f inet'
     else:   # pragma: no cover
@@ -285,7 +269,7 @@ def portUdpListen(port):
         line=line.strip()
         if not line:
             continue
-        if osname in ('Darwin','AIX'):
+        if osname in ('AIX'):
             if not line.startswith('udp'):
                 continue
             localip=line.split()[3]
@@ -333,8 +317,6 @@ def portTcpListen(port, ip=None):
         cmd='/bin/netstat -ant'
     elif osname=='SunOS':
         cmd='/bin/netstat -an -P tcp -f inet'
-    elif osname=='Darwin':
-        cmd='/usr/sbin/netstat -an -p tcp'
     elif osname=='AIX':
         cmd='/usr/bin/netstat -an -f inet'
     else:   # pragma: no cover
@@ -556,9 +538,9 @@ def packageInfo(pkgname):
     """
     vers=''
     if ';' in pkgname or '`' in pkgname:
-        exitError("Funny buggers with check.packageInfo")
+        exitError("Problem with check.packageInfo")
     if not pkgname.strip():
-        exitError("Silly buggers with check.packageInfo")
+        exitError("Problem with check.packageInfo")
     if os.uname()[0]=='SunOS':
         f=os.popen('/bin/pkginfo -l %s 2>/dev/null' % pkgname)
         for line in f:
